@@ -1,66 +1,235 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <title>Gestión de Mantenimiento</title>
-  <link rel="stylesheet" href="style.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sistema de Mantenimiento</title>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <h1>Gestión de Mantenimiento Industrial</h1>
+<header>
+  <h1 id="empresa">Empresa XYZ - Sistema de Mantenimiento</h1>
+</header>
 
-  <section id="ordenes">
-    <h2>Nueva orden de mantenimiento</h2>
-    <form id="formOrden">
-      <label>Equipo:</label>
-      <input type="text" id="equipo" placeholder="Ej. Compresor principal" required>
-
-      <label>Responsable:</label>
-      <input type="text" id="responsable" placeholder="Ej. Juan Pérez" required>
-
-      <label>Descripción de mantenimiento:</label>
-      <textarea id="descripcion" placeholder="Ej. Cambio de aceite y revisión de válvulas" required></textarea>
-
-      <label>Materiales utilizados:</label>
-      <textarea id="materiales" placeholder="Ej. 2L de aceite SAE 40, filtro nuevo"></textarea>
-
-      <label>¿Se detectó alguna falla?</label>
-      <select id="fallaDetectada">
-        <option value="No">No</option>
-        <option value="Sí">Sí</option>
-      </select>
-
-      <label>Foto (opcional):</label>
-      <input type="file" id="fotoMantenimiento" accept="image/*">
-
-      <button type="submit">Guardar orden</button>
+<main>
+  <section id="activos-section">
+    <h2>Inventario de Activos</h2>
+    <ul id="lista-activos"></ul>
+    <h3>Agregar/Modificar Activo</h3>
+    <form id="form-activo">
+      <input type="text" name="code" placeholder="Código de máquina" required>
+      <input type="text" name="area" placeholder="Área">
+      <input type="text" name="equipment" placeholder="Equipo">
+      <input type="text" name="system" placeholder="Sistema">
+      <input type="text" name="component" placeholder="Componente">
+      <button type="submit">Guardar Activo</button>
     </form>
   </section>
 
-  <section id="fallas">
-    <h2>Reportar falla</h2>
-    <form id="formFalla">
-      <label>Equipo:</label>
-      <input type="text" id="equipoFalla" placeholder="Ej. Motor de cinta transportadora" required>
-
-      <label>Descripción de la falla:</label>
-      <textarea id="descripcionFalla" placeholder="Ej. Vibración anormal y ruido en el eje"></textarea>
-
-      <label>Foto antes de reparación:</label>
-      <input type="file" id="fotoFalla" accept="image/*">
-
-      <label>Foto después de reparación:</label>
-      <input type="file" id="fotoReparacion" accept="image/*">
-
-      <button type="submit">Guardar falla</button>
+  <section id="repuestos-section">
+    <h2>Inventario de Repuestos</h2>
+    <ul id="lista-repuestos"></ul>
+    <h3>Agregar Repuesto</h3>
+    <form id="form-repuesto">
+      <select name="assetId" id="repuesto-asset"></select>
+      <input type="text" name="name" placeholder="Nombre Repuesto" required>
+      <input type="number" name="quantity" placeholder="Cantidad" required>
+      <button type="submit">Agregar Repuesto</button>
     </form>
   </section>
 
-  <section id="historial">
-    <h2>Historial de fallas</h2>
-    <ul id="listaFallas"></ul>
+  <section id="ordenes-section">
+    <h2>Órdenes de Mantenimiento</h2>
+    <ul id="lista-ordenes"></ul>
+    <h3>Nueva Orden de Mantenimiento</h3>
+    <form id="form-orden">
+      <select name="assetId" required></select>
+      <input type="text" name="tipo" placeholder="Tipo de orden">
+      <input type="text" name="solicitadoPor" placeholder="Solicitado por">
+      <input type="text" name="responsable" placeholder="Responsable">
+      <textarea name="descripcion" placeholder="Descripción del mantenimiento"></textarea>
+      <button type="submit">Nueva Orden de Mantenimiento</button>
+    </form>
   </section>
 
-  <script type="module" src="firebase.js"></script>
-  <script type="module" src="script.js"></script>
+  <section id="fallas-section">
+    <h2>Historial de Fallas</h2>
+    <ul id="lista-fallas"></ul>
+    <h3>Reportar Falla</h3>
+    <form id="form-falla">
+      <select name="assetId" required></select>
+      <input type="text" name="reporto" placeholder="Reportó">
+      <textarea name="descripcion" placeholder="Descripción de la falla"></textarea>
+      <input type="file" name="fotosAntes" multiple>
+      <button type="submit">Reportar Falla</button>
+    </form>
+  </section>
+</main>
+
+<script src="app.js"></script>
 </body>
 </html>
+body { font-family: Arial, sans-serif; margin:0; padding:0; }
+header { background:#007BFF; color:white; padding:10px; text-align:center; }
+main { padding:20px; }
+section { margin-bottom:30px; border:1px solid #ccc; padding:10px; border-radius:8px; }
+ul { list-style:none; padding:0; }
+li { margin:5px 0; padding:5px; border-bottom:1px solid #eee; display:flex; justify-content: space-between; }
+button { margin-left:5px; }
+.in-stock { color:green; font-weight:bold; }
+.out-stock { color:red; font-weight:bold; }
+form input, form select, form textarea { display:block; margin:5px 0; padding:5px; width:100%; max-width:400px; }
+const API = "http://localhost:3000";
+
+async function cargarEmpresa() {
+  document.getElementById("empresa").textContent = "Empresa XYZ - Sistema de Mantenimiento";
+}
+
+// -------- ACTIVOS --------
+async function cargarActivos() {
+  const res = await fetch(`${API}/activos`);
+  const activos = await res.json();
+  const cont = document.getElementById("lista-activos");
+  cont.innerHTML = "";
+  const selectAssets = document.querySelectorAll("select[name='assetId']");
+  selectAssets.forEach(s=>s.innerHTML="");
+  activos.forEach(a=>{
+    cont.innerHTML += `<li>${a.code} - ${a.equipment} (${a.area}) 
+      <button onclick="editarActivo(${a.id})">Editar</button>
+      <button onclick="borrarActivo(${a.id})">Borrar</button></li>`;
+    selectAssets.forEach(s=>{
+      s.innerHTML += `<option value="${a.id}">${a.code} - ${a.equipment}</option>`;
+    });
+  });
+}
+
+document.getElementById("form-activo").addEventListener("submit", async e=>{
+  e.preventDefault();
+  const data = Object.fromEntries(new FormData(e.target));
+  await fetch(`${API}/activos`, {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(data)});
+  e.target.reset();
+  cargarActivos();
+});
+
+async function borrarActivo(id){
+  if(!confirm("Borrar activo?")) return;
+  await fetch(`${API}/activos/${id}`,{method:"DELETE"});
+  cargarActivos();
+}
+
+async function editarActivo(id){
+  const data = prompt("Ingrese nuevos datos JSON", '{"code":"","area":"","equipment":"","system":"","component":""}');
+  if(!data) return;
+  await fetch(`${API}/activos/${id}`,{method:"PUT", headers:{"Content-Type":"application/json"}, body:data});
+  cargarActivos();
+}
+
+// -------- REPUESTOS --------
+async function cargarRepuestos(){
+  const res = await fetch(`${API}/repuestos`);
+  const reps = await res.json();
+  const cont = document.getElementById("lista-repuestos");
+  cont.innerHTML = "";
+  reps.forEach(r=>{
+    const status = r.quantity>0 ? "IN STOCK ✅" : "SIN STOCK ❌";
+    const colorClass = r.quantity>0 ? "in-stock":"out-stock";
+    cont.innerHTML += `<li>${r.name} (${r.AssetId}) - <span class="${colorClass}">${status} (${r.quantity})</span>
+      <button onclick="ajustarRepuesto(${r.id},1)">+</button>
+      <button onclick="ajustarRepuesto(${r.id},-1)">-</button>
+      <button onclick="borrarRepuesto(${r.id})">Borrar</button>
+    </li>`;
+  });
+}
+
+document.getElementById("form-repuesto").addEventListener("submit", async e=>{
+  e.preventDefault();
+  const data = Object.fromEntries(new FormData(e.target));
+  data.quantity = Number(data.quantity);
+  await fetch(`${API}/repuestos`, {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(data)});
+  e.target.reset();
+  cargarRepuestos();
+});
+
+async function ajustarRepuesto(id, delta){
+  await fetch(`${API}/repuestos/${id}/adjust`,{method:"PUT", headers:{"Content-Type":"application/json"}, body:JSON.stringify({delta})});
+  cargarRepuestos();
+}
+
+async function borrarRepuesto(id){
+  if(!confirm("Borrar repuesto?")) return;
+  await fetch(`${API}/repuestos/${id}`,{method:"DELETE"});
+  cargarRepuestos();
+}
+
+// -------- ORDENES --------
+async function cargarOrdenes(){
+  const res = await fetch(`${API}/ordenes`);
+  const ords = await res.json();
+  const cont = document.getElementById("lista-ordenes");
+  cont.innerHTML = "";
+  ords.forEach(o=>{
+    const dur = o.duracionMinutos || "En progreso";
+    cont.innerHTML += `<li>Orden #${o.id} - ${o.tipo} - Solicitado por: ${o.solicitadoPor} - Responsable: ${o.responsable} - Duración: ${dur} min
+      <button onclick="finalizarOrden(${o.id})">Finalizar</button>
+    </li>`;
+  });
+}
+
+document.getElementById("form-orden").addEventListener("submit", async e=>{
+  e.preventDefault();
+  const data = Object.fromEntries(new FormData(e.target));
+  await fetch(`${API}/ordenes`, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(data)});
+  e.target.reset();
+  cargarOrdenes();
+});
+
+async function finalizarOrden(id){
+  const data = prompt("Ingrese datos JSON: completadoBy, trabajosRealizados, repuestosUtilizados, insumos, observaciones, fotos (array)","");
+  if(!data) return;
+  await fetch(`${API}/ordenes/${id}/finalizar`, {method:"POST", headers:{"Content-Type":"application/json"}, body:data});
+  cargarOrdenes();
+}
+
+// -------- FALLAS --------
+async function cargarFallas(){
+  const res = await fetch(`${API}/fallas`);
+  const fallas = await res.json();
+  const cont = document.getElementById("lista-fallas");
+  cont.innerHTML = "";
+  fallas.forEach(f=>{
+    const dur = f.duracionMinutos || "En progreso";
+    cont.innerHTML += `<li>Falla #${f.id} - Reportó: ${f.reporto} - Técnico: ${f.tecnico || 'Pendiente'} - Descripción: ${f.descripcion} - Duración: ${dur} min
+      <button onclick="finalizarFalla(${f.id})">Finalizar</button>
+      <button onclick="borrarFalla(${f.id})">Borrar</button>
+    </li>`;
+  });
+}
+
+document.getElementById("form-falla").addEventListener("submit", async e=>{
+  e.preventDefault();
+  const data = Object.fromEntries(new FormData(e.target));
+  data.fotosAntes = []; // Para simplificar, luego se puede implementar subida de archivos
+  await fetch(`${API}/fallas`, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(data)});
+  e.target.reset();
+  cargarFallas();
+});
+
+async function finalizarFalla(id){
+  const data = prompt("Ingrese datos JSON: tecnico, repuestosUtilizados, insumos, observaciones, fotosDespues (array)","");
+  if(!data) return;
+  await fetch(`${API}/fallas/${id}/finalizar`, {method:"POST", headers:{"Content-Type":"application/json"}, body:data});
+  cargarFallas();
+}
+
+async function borrarFalla(id){
+  if(!confirm("Borrar falla?")) return;
+  await fetch(`${API}/fallas/${id}`,{method:"DELETE"});
+  cargarFallas();
+}
+
+// ------- Inicialización -------
+cargarEmpresa();
+cargarActivos();
+cargarRepuestos();
+cargarOrdenes();
+cargarFallas();
