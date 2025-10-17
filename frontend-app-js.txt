@@ -1,0 +1,172 @@
+const API = ""; // si el frontend se sirve desde el backend en Render, dejalo vacio ""; si separas, pon la URL completa como https://tudominio.onrender.com
+
+// Helpers: fetch with base
+const apiFetch = (path, opts={}) => fetch((API||"") + path, opts).then(r=>r.json());
+
+// DOM refs
+const saveAssetBtn = document.getElementById("saveAsset");
+const assetsList = document.getElementById("assetsList");
+const failuresTbody = document.querySelector("#failuresTable tbody");
+
+// Guardar activo
+saveAssetBtn.addEventListener("click", async ()=>{
+  const code = document.getElementById("asset_code").value.trim();
+  const area = document.getElementById("asset_area").value.trim();
+  const equipment = document.getElementById("asset_equipment").value.trim();
+  const system = document.getElementById("asset_system").value.trim();
+  const component = document.getElementById("asset_component").value.trim();
+  if(!code || !equipment) return alert("Código y equipo obligatorios");
+  await apiFetch("/api/activos", {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ code, area, equipment, system, component })
+  });
+  document.getElementById("asset_code").value="";
+  document.getElementById("asset_area").value="";
+  document.getElementById("asset_equipment").value="";
+  document.getElementById("asset_system").value="";
+  document.getElementById("asset_component").value="";
+  loadAssets();
+});
+
+// cargar activos
+async function loadAssets(){
+  const items = await apiFetch("/api/activos");
+  assetsList.innerHTML = "";
+  for(const a of items){
+    const div = document.createElement("div");
+    div.className = "asset-card";
+    div.innerHTML = `
+      <strong>${a.code}</strong> — ${a.equipment} <span style="color:#6b7280">(${a.area})</span>
+      <div style="margin-top:6px">
+        <button class="small" onclick='openNewOrder("${a.id}")'>➕ Nueva Orden de Mantenimiento</button>
+        <button class="small" onclick='openReportFailure("${a.id}")'>⚠️ Reportar Falla</button>
+        <button class="small" onclick='manageParts("${a.id}")'>🔩 Repuestos</button>
+        <button class="small" onclick='editAsset("${a.id}")'>Editar</button>
+        <button class="small" onclick='deleteAsset("${a.id}")'>Eliminar</button>
+      </div>
+      <div id="asset-${a.id}-lists" style="margin-top:10px"></div>
+    `;
+    assetsList.appendChild(div);
+    renderAssetDetail(a);
+  }
+}
+async function renderAssetDetail(a){
+  // traer ordenes
+  const res = await apiFetch(`/api/ordenes/asset/${a.id}`);
+  const detail = document.getElementById(`asset-${a.id}-lists`);
+  detail.innerHTML = `
+    <div><strong>Órdenes:</strong>
+    <ul>${res.length?res.map(o=>`<li>${new Date(o.inicio).toLocaleString()} - ${o.tipo} - Solicitó: ${o.solicitadoPor || '-'} - Resp: ${o.responsable || '-'} - Dur: ${o.duracionMinutos? o.duracionMinutos+' min':'En curso'} ${o.fin? '':''} ${o.fin? '':''} ${!o.fin? `<button class="small" onclick='finishOrder(${o.id})'>✅ Finalizar</button>`:''}</li>`).join(''):'<li style="color:#6b7280">Sin órdenes</li>'}</ul></div>
+  `;
+}
+
+// eliminar activo
+async function deleteAsset(id){ if(!confirm("Eliminar activo?")) return; await apiFetch(`/api/activos/${id}`,{method:"DELETE"}); loadAssets(); loadFailures(); }
+
+// editar activo — simple: cargar en inputs y eliminar original (o usar PUT)
+async function editAsset(id){
+  const a = await apiFetch(`/api/activos`);
+  const item = a.find(x=>x.id==id);
+  if(!item) return;
+  document.getElementById("asset_code").value = item.code;
+  document.getElementById("asset_area").value = item.area || "";
+  document.getElementById("asset_equipment").value = item.equipment || "";
+  document.getElementById("asset_system").value = item.system || "";
+  document.getElementById("asset_component").value = item.component || "";
+  // delete original to avoid duplicates on simple flow
+  await apiFetch(`/api/activos/${id}`,{ method:"DELETE" });
+  loadAssets();
+}
+
+// ---- ORDENES ----
+// abre modal de orden simple con prompts (podés reemplazar por formulario)
+window.openNewOrder = async function(assetId){
+  const tipo = prompt("Tipo (Preventivo/Correctivo):","Preventivo");
+  const solicitadoPor = prompt("Solicitado por:","Operador - Ej: Juan Perez");
+  const responsable = prompt("Responsable:","Supervisor - Ej: Ing. Luis");
+  const descripcion = prompt("Descripción de la orden:","Ej: Revisar bomba y cambiar sello");
+  if(!tipo || !solicitadoPor) return;
+  const ord = await apiFetch("/api/ordenes", {
+    method:"POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ assetId, tipo, solicitadoPor, responsable, descripcion })
+  });
+  alert("Orden creada. comenzará a contar tiempo automáticamente.");
+  loadAssets();
+}
+
+// finalizar orden -> abrir prompts y enviar fotos (simplificado)
+window.finishOrder = async function(ordenId){
+  const completadoBy = prompt("¿Quién realizó el mantenimiento?","Técnico - Ej: Pedro");
+  const trabajosRealizados = prompt("Trabajos realizados:","Ej: Cambio de sello");
+  const repuestos = prompt("Repuestos usados:","Ej: Sello x1");
+  const insumos = prompt("Insumos:","Ej: Aceite 1L");
+  const observaciones = prompt("Observaciones:","Ej: Todo correcto");
+  // fotos: pedimos archivo? Simplifico con prompt para URL o mensaje (puedes implementar input file modal)
+  const fotos = [];
+  const res = await apiFetch(`/api/ordenes/${ordenId}/finalizar`, {
+    method:"POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ completadoBy, trabajosRealizados, repuestosUtilizados:repuestos, insumos, observations:observaciones, fotos })
+  });
+  alert("Orden finalizada.");
+  loadAssets();
+}
+
+// ---- FALLAS ----
+window.openReportFailure = async function(assetId){
+  const reporto = prompt("¿Quién reporta?","Operador - Ej: María");
+  const descripcion = prompt("Descripción de falla:","Ej: Ruido fuerte en motor");
+  if(!reporto || !descripcion) return;
+  // para fotos, abrimos una pequeña ventana para subir y obtener URLs -> simplificamos: no fotos
+  const obj = await apiFetch("/api/fallas", {
+    method:"POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ assetId, reporto, descripcion, fotosAntes:[] })
+  });
+  alert("Falla reportada. Se inició el contador.");
+  loadAssets();
+  loadFailures();
+}
+
+async function loadFailures(){
+  const list = await apiFetch("/api/fallas");
+  failuresTbody.innerHTML = "";
+  for(const f of list){
+    const row = document.createElement("tr");
+    row.innerHTML = `<td>${f.AssetId}</td>
+      <td>${f.reporto}</td>
+      <td>${f.tecnico || '-'}</td>
+      <td>${new Date(f.inicio).toLocaleString()}</td>
+      <td>${f.fin? new Date(f.fin).toLocaleString():'-'}</td>
+      <td>${f.duracionMinutos? f.duracionMinutos+' min':'En curso'}</td>
+      <td>${f.descripcion}</td>
+      <td>${(f.fotosAntes || []).map(u=>`<img class="img-thumb" src="${u}">`).join('') || '-'}</td>
+      <td><button class="small" onclick="finalizeFailure('${f.id}')">Finalizar</button> <button class="small danger" onclick="deleteFailure('${f.id}')">Borrar</button></td>`;
+    failuresTbody.appendChild(row);
+  }
+}
+window.finalizeFailure = async function(id){
+  const tecnico = prompt("Técnico que repara:","Ej: Pedro");
+  const repuestos = prompt("Repuestos utilizados:","");
+  const insumos = prompt("Insumos:","");
+  const observaciones = prompt("Observaciones:","");
+  // fotosDespues: no implementado file uploader en esta versión simple
+  await apiFetch(`/api/fallas/${id}/finalizar`, {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ tecnico, repuestosUtilizados:repuestos, insumos, observations:observaciones, fotosDespues:[] })
+  });
+  alert("Falla finalizada.");
+  loadFailures(); loadAssets();
+}
+window.deleteFailure = async function(id){
+  if(!confirm("Eliminar registro?")) return;
+  await apiFetch(`/api/fallas/${id}`, { method: "DELETE" });
+  loadFailures();
+}
+
+// inicial load
+loadAssets();
+loadFailures();

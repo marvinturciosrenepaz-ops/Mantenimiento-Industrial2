@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Sistema Mantenimiento — Web</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <h1>Gestión de Mantenimiento</h1>
+
+  <section class="container">
+    <h2>➕ Activo (Agregar / Editar)</h2>
+    <label>Código (Ej: EQP-MEC-001)</label><input id="asset_code" placeholder="EQP-MEC-001">
+    <label>Área</label><input id="asset_area" placeholder="Planta 1">
+    <label>Equipo</label><input id="asset_equipment" placeholder="Bomba centrifuga">
+    <label>Sistema</label><input id="asset_system" placeholder="Enfriamiento">
+    <label>Componente</label><input id="asset_component" placeholder="Rodamiento">
+    <button id="saveAsset">Guardar Activo</button>
+  </section>
+
+  <section class="container">
+    <h2>🏭 Lista de Activos</h2>
+    <div id="assetsList"></div>
+  </section>
+
+  <section class="container">
+    <h2>🧾 Historial Global de Fallas</h2>
+    <table id="failuresTable">
+      <thead>
+        <tr><th>Código</th><th>Reportó</th><th>Técnico</th><th>Inicio</th><th>Fin</th><th>Duración</th><th>Descripción</th><th>Fotos</th><th>Acciones</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+<script src="app.js"></script>
+</body>
+</html>
